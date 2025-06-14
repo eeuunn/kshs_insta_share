@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 가상환경
+.venv/
+env/
+venv/
+
+# Django
+*.sqlite3
+/media/
+/staticfiles/
+/static_root/
+
+# 환경변수 파일
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Mac
+.DS_Store

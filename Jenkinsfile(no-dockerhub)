@@ -1,0 +1,95 @@
+// Jenkinsfile
+
+def component = [
+    kshs_insta: true
+]
+
+pipeline {
+    agent any
+
+    // Discord Webhook URL은 Jenkins Credentials에 저장된 ID를 사용합니다.
+    environment {
+        DISCORD_WEBHOOK = credentials('kshs_insta-discord-webhook')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                script {
+                    component.each { name, enabled ->
+                        if (!enabled) return
+                        stage("${name} Build") {
+                            // docker-compose.yml 에 정의된 서비스명을 사용
+                            sh "docker-compose -f docker-compose.yml build ${name}"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Tag') {
+            steps {
+                script {
+                    component.each { name, enabled ->
+                        if (!enabled) return
+                        stage("${name} Tag") {
+                            // build 시 생성된 이미지: kshs_insta_app:latest
+                            sh "docker tag ${name}:latest ${name}-deploy:latest"
+                            // 로컬 빌드 이미지 제거
+                            sh "docker rmi ${name}:latest || true"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                script {
+                    component.each { name, enabled ->
+                        if (!enabled) return
+                        stage("${name} Deploy") {
+                            // 기존 컨테이너가 돌고 있으면 중지·삭제
+                            sh """
+                              if [ \$(docker ps -a -q --filter "name=${name}") ]; then
+                                docker stop ${name} && docker rm ${name}
+                              fi
+                            """
+                            // 새 이미지로 컨테이너 실행 (포트 · restart 정책은 docker-compose.yml 과 동일하게)
+                            sh "docker run -d -p 8857:8857 --name ${name} --restart unless-stopped ${name}-deploy:latest"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            discordSend(
+                description: "Jenkins CI/CD | kshs_insta_app",
+                footer: "Build Success ✅",
+                link: env.BUILD_URL,
+                result: currentBuild.currentResult,
+                title: "Job ${env.JOB_NAME} #${env.BUILD_NUMBER} succeeded",
+                webhookURL: env.DISCORD_WEBHOOK
+            )
+        }
+        failure {
+            discordSend(
+                description: "Jenkins CI/CD | kshs_insta_app",
+                footer: "Build Failure ❌",
+                link: env.BUILD_URL,
+                result: currentBuild.currentResult,
+                title: "Job ${env.JOB_NAME} #${env.BUILD_NUMBER} failed",
+                webhookURL: env.DISCORD_WEBHOOK
+            )
+        }
+    }
+}

@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+  kshs_insta:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kshs_insta
+    container_name: kshs_insta
+    ports:
+      - '8857:8857'
+    environment:
+      - TZ=Asia/Seoul
+      - INSTAGRAM_USERNAME=kshs__official
+      - INSTAGRAM_PASSWORD=
+      - NEIS_API_KEY=
+    volumes:
+      - ./static:/app/static
+      - ./media:/app/media
+      - ig_session:/app/ig_session
+      
+volumes:
+  ig_session: {} 
